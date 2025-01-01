@@ -28,7 +28,10 @@ $cleanupOptions = @(
     "Temporary Files",
     "Windows Error Reporting Files",
     "Temporary Setup Files",
-    "Update Cleanup"
+    "Update Cleanup",
+    "Recycle Bin",
+    "Previous Installations",
+    "Thumbnail Cache"
 )
 
 # Set the StateFlags DWORD value for the specified sageset number
