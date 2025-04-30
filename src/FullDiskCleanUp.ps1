@@ -5,7 +5,7 @@ function Test-IsAdministrator {
     return $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-# Check if the script is running as Administrator
+# Elevate if not already running as Admin
 if (-not (Test-IsAdministrator)) {
     Write-Host "This script needs to be run as an Administrator."
     Write-Host "Trying to restart with elevated privileges..."
@@ -14,14 +14,14 @@ if (-not (Test-IsAdministrator)) {
 }
 
 # Define the sageset number and format it with leading zeros
-$sagesetNumber = 500
-$formattedNumber = $sagesetNumber.ToString("D4")  # Formats the number as four digits
-$stateFlagsName = "StateFlags$formattedNumber"
+$sagesetNumber    = 500
+$formattedNumber = $sagesetNumber.ToString("D4")  # four-digit format
+$stateFlagsName  = "StateFlags$formattedNumber"
 
-# Define the path to the registry key for VolumeCaches
+# Registry path for VolumeCaches
 $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches"
 
-# Define the list of specific cleanup options to modify
+# List of built-in cleanup options
 $cleanupOptions = @(
     "Delivery Optimization Files",
     "Device Driver Packages",
@@ -34,18 +34,17 @@ $cleanupOptions = @(
     "Thumbnail Cache"
 )
 
-# Set the StateFlags DWORD value for the specified sageset number
+# Apply StateFlags to each option
 foreach ($option in $cleanupOptions) {
-    $optionPath = "$regPath\$option"
+    $optionPath = Join-Path $regPath $option
     if (Test-Path $optionPath) {
-        # Set the StateFlags DWORD for the formatted sageset number
         Set-ItemProperty -Path $optionPath -Name $stateFlagsName -Value 2
     } else {
         Write-Host "Registry path not found for option: $option"
     }
 }
 
-# Run the cleanmgr command with the specified sageset number
+# Run Disk Cleanup
 try {
     Start-Process cleanmgr -ArgumentList "/sagerun:$sagesetNumber" -Wait -NoNewWindow
     Write-Host "cleanmgr /sagerun:$sagesetNumber has been executed."
@@ -53,13 +52,35 @@ try {
     Write-Host "Failed to run cleanmgr. Error: $_"
 }
 
-# Remove the StateFlags DWORD value for the specified sageset number
+# Remove the custom StateFlags entries
 foreach ($option in $cleanupOptions) {
-    $optionPath = "$regPath\$option"
+    $optionPath = Join-Path $regPath $option
     if (Test-Path $optionPath) {
-        # Remove the StateFlags DWORD if it exists
         Remove-ItemProperty -Path $optionPath -Name $stateFlagsName -ErrorAction SilentlyContinue
     }
 }
 
-Write-Host "StateFlags values for sageset number $sagesetNumber have been removed for specified cleanup options."
+# === Additional arbitrary cleanup paths ===
+# Just add any folder paths you want wiped here:
+$extraCleanupPaths = @(
+    # Stremio cache (relative to %APPDATA%)
+    Join-Path $env:APPDATA 'stremio\stremio-server\stremio-cache'
+
+    # Example of an absolute path:
+    # 'C:\Temp\OldDownloads'
+
+    # Example of another env-based path:
+    # Join-Path $env:LOCALAPPDATA 'MyApp\Cache'
+)
+
+foreach ($path in $extraCleanupPaths) {
+    if (Test-Path $path) {
+        Write-Host "Deleting all contents in: $path"
+        Get-ChildItem -Path $path -Force | Remove-Item -Recurse -Force
+        Write-Host "✅ Cleared: $path"
+    } else {
+        Write-Host "❌ Path not found: $path"
+    }
+}
+
+Write-Host "All cleanup tasks completed."
